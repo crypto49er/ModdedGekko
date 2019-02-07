@@ -32,9 +32,18 @@ config.watch = {
 
 config.tradingAdvisor = {
   enabled: true,
-  method: 'MACD',
-  candleSize: 60,
-  historySize: 10,
+  method: 'DCA',
+  candleSize: 1440,
+  historySize: 0,
+}
+
+// DCA settings:
+config.DCA = {
+  // Set buy frequency: daily = 1, weekly = 7, monthly = 30 
+  frequency: 7,
+  // Set dollar amount (default is USD, change currency in config.watch.currency)
+  amount: 10,
+
 }
 
 // MACD settings:

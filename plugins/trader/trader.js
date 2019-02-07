@@ -109,8 +109,8 @@ Trader.prototype.setPortfolio = function() {
 Trader.prototype.setBalance = function() {
   this.balance = this.portfolio.currency + this.portfolio.asset * this.price;
   this.exposure = (this.portfolio.asset * this.price) / this.balance;
-  // if more than 10% of balance is in asset we are exposed
-  this.exposed = this.exposure > 0.1;
+  // We are considered exposed only if exposure is 100%
+  this.exposed = this.exposure == 1;
 }
 
 Trader.prototype.processCandle = function(candle, done) {
@@ -181,7 +181,11 @@ Trader.prototype.processAdvice = function(advice) {
       });
     }
 
-    amount = this.portfolio.currency / this.price * 0.95;
+// Use the amount specified in config file to determine how much currency to use per buy
+let dcaAmount = config.DCA.amount;
+// Use the entire balance if balance is less than dcaAmount (Ex: balance = $7, dcaAmount = $10)
+amount = (this.portfolio.currency > dcaAmount ? dcaAmount : this.portfolio.currency) / this.price;
+
 
     log.info(
       'Trader',
