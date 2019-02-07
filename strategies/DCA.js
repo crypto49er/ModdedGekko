@@ -24,6 +24,7 @@ strat.init = function() {
   // We exit if candle size is not 1440 (1 day)
   // This makes it easy to calculate how often
   // the bot should issue a buy signal
+
   if (config.tradingAdvisor.candleSize !== 1440) {
     throw "This strategy must run with candleSize=1440, go to the config file and adjust the candle size under config.TradingAdvisor";
   }
@@ -34,6 +35,7 @@ strat.init = function() {
   this.buyCounter = 0;
   this.input = 'candle';
   this.requiredHistory = 0;
+  this.tradeInitiated = false;
 
 }
 
@@ -50,10 +52,22 @@ strat.check = function() {
   this.buyCounter++;
   log.debug('Buy Counter ', this.buyCounter);
 
-  if (this.buyCounter == this.buyFrequency) {
+  if (this.buyCounter >= this.buyFrequency && !this.tradeInitiated) {
     this.advice('long');
     this.buyCounter = 0;
   }
+}
+
+// Prevent additional trades from happening until trade is completed
+// Not necessary for time frames higher than 1 hour, but it's enabled 
+strat.onPendingTrade = function () {
+  log.info('Trade Initiated');
+  this.tradeInitiated = true;
+}
+
+strat.onTrade = function() {
+  log.info('Trade Completed');
+  this.tradeInitiated = false;
 }
 
 module.exports = strat;

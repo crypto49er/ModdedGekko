@@ -109,8 +109,8 @@ Trader.prototype.setPortfolio = function() {
 Trader.prototype.setBalance = function() {
   this.balance = this.portfolio.currency + this.portfolio.asset * this.price;
   this.exposure = (this.portfolio.asset * this.price) / this.balance;
-  // We are considered exposed only if exposure is 100%
-  this.exposed = this.exposure == 1;
+  // We are considered exposed only if exposure is 20%
+  this.exposed = this.exposure >= 0.2;
 }
 
 Trader.prototype.processCandle = function(candle, done) {
@@ -169,17 +169,6 @@ Trader.prototype.processAdvice = function(advice) {
 
   if(direction === 'buy') {
 
-    if(this.exposed) {
-      log.info('NOT buying, already exposed');
-      return this.deferredEmit('tradeAborted', {
-        id,
-        adviceId: advice.id,
-        action: direction,
-        portfolio: this.portfolio,
-        balance: this.balance,
-        reason: "Portfolio already in position."
-      });
-    }
 
 // Use the amount specified in config file to determine how much currency to use per buy
 let dcaAmount = config.DCA.amount;
@@ -189,23 +178,12 @@ amount = (this.portfolio.currency > dcaAmount ? dcaAmount : this.portfolio.curre
 
     log.info(
       'Trader',
-      'Received advice to go long.',
-      'Buying ', this.brokerConfig.asset
+      'received advice to go long.',
+      'Buying', this.brokerConfig.asset
     );
 
   } else if(direction === 'sell') {
 
-    if(!this.exposed) {
-      log.info('NOT selling, already no exposure');
-      return this.deferredEmit('tradeAborted', {
-        id,
-        adviceId: advice.id,
-        action: direction,
-        portfolio: this.portfolio,
-        balance: this.balance,
-        reason: "Portfolio already in position."
-      });
-    }
 
     // clean up potential old stop trigger
     if(this.activeStopTrigger) {
@@ -223,8 +201,8 @@ amount = (this.portfolio.currency > dcaAmount ? dcaAmount : this.portfolio.curre
 
     log.info(
       'Trader',
-      'Received advice to go short.',
-      'Selling ', this.brokerConfig.asset
+      'received advice to go short.',
+      'Selling', this.brokerConfig.asset
     );
   }
 
