@@ -159,6 +159,7 @@ Trader.prototype.buy = function(amount, price, callback) {
   const buyParams = {
     price: this.getMaxDecimalsNumber(price, this.currency == 'BTC' ? 5 : 2),
     size: this.getMaxDecimalsNumber(amount),
+    type: 'limit',
     product_id: this.pair,
     post_only: this.post_only,
   };
@@ -180,6 +181,7 @@ Trader.prototype.sell = function(amount, price, callback) {
   const sellParams = {
     price: this.getMaxDecimalsNumber(price, this.currency == 'BTC' ? 5 : 2),
     size: this.getMaxDecimalsNumber(amount),
+    type: 'limit',
     product_id: this.pair,
     post_only: this.post_only,
   };
