@@ -189,8 +189,11 @@ PerformanceAnalyzer.prototype.calculateReportStatistics = function() {
   // the portfolio's balance is measured in {currency}
   const profit = this.balance - this.start.balance;
 
+  // if end date is not populated, fill it with a 0 as we can't caculate duration
   const timespan = moment.duration(
-    this.dates.end.diff(this.dates.start)
+    this.dates.end ? 
+    this.dates.end.diff(this.dates.start) 
+    : 0
   );
   const relativeProfit = this.balance / this.start.balance * 100 - 100;
   const relativeYearlyProfit = relativeProfit / timespan.asYears();
@@ -207,8 +210,12 @@ PerformanceAnalyzer.prototype.calculateReportStatistics = function() {
   const ratioRoundTrips = this.roundTrips.length > 0 ? (this.roundTrips.filter(roundTrip => roundTrip.pnl > 0 ).length / this.roundTrips.length * 100).toFixed(4) : 100;
 
   const report = {
-    startTime: this.dates.start.utc().format('YYYY-MM-DD HH:mm:ss'),
-    endTime: this.dates.end.utc().format('YYYY-MM-DD HH:mm:ss'),
+    startTime: this.dates.start ?
+    this.dates.start.utc().format('YYYY-MM-DD HH:mm:ss') 
+    : 0,
+    endTime: this.dates.end ? 
+    this.dates.end.utc().format('YYYY-MM-DD HH:mm:ss')
+    : 0,
     timespan: timespan.humanize(),
     market: this.endPrice * 100 / this.startPrice - 100,
 
