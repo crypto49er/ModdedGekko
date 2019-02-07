@@ -103,6 +103,10 @@ Actor.prototype.emitStratCandle = function(candle) {
   this.strategy.tick(candle, next);
 }
 
+Actor.prototype.processTradeInitiated = function(pendingTrade) {
+  this.strategy.processPendingTrade(pendingTrade);
+}
+
 Actor.prototype.processTradeCompleted = function(trade) {
   this.strategy.processTrade(trade);
 }

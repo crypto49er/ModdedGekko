@@ -218,6 +218,10 @@ Base.prototype.processTrade = function(trade) {
   this.onTrade(trade);
 }
 
+Base.prototype.processPendingTrade = function(pendingTrade) {
+  this.onPendingTrade(pendingTrade);
+}
+
 Base.prototype.addTalibIndicator = function(name, type, parameters) {
   this.asyncIndicatorRunner.addTalibIndicator(name, type, parameters);
 }
