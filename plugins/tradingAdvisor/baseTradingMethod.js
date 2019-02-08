@@ -272,15 +272,18 @@ Base.prototype.advice = function(newDirection) {
   }
 
   let trigger;
+  let amount;
+  let percentage;
   if(_.isObject(newDirection)) {
     if(!_.isString(newDirection.direction)) {
       log.error('Strategy emitted unparsable advice:', newDirection);
       return;
     }
 
-    if(newDirection.direction === this._currentDirection) {
-      return;
-    }
+    // commenting this out to allow multiple trades in same direction
+    // if(newDirection.direction === this._currentDirection) {
+    //   return;
+    // }
 
     if(_.isObject(newDirection.trigger)) {
       if(newDirection.direction !== 'long') {
@@ -300,6 +303,19 @@ Base.prototype.advice = function(newDirection) {
       }
     }
 
+    if(_.isNumber(newDirection.amount)) {
+      if (newDirection.amount > 0) {
+        amount = newDirection.amount;
+      }
+    }
+
+    if(_.isNumber(newDirection.percentage)) {
+      if (newDirection.percentage > 0) {
+        percentage = newDirection.percentage;
+      }
+    }
+
+
     newDirection = newDirection.direction;
   }
 
@@ -318,7 +334,9 @@ Base.prototype.advice = function(newDirection) {
 
   const advice = {
     id: 'advice-' + this.propogatedAdvices,
-    recommendation: newDirection
+    recommendation: newDirection,
+    amount: amount,
+    percentage: percentage,
   };
 
   if(trigger) {

@@ -53,7 +53,8 @@ PaperTrader.prototype.relayPortfolioChange = function() {
 
 PaperTrader.prototype.relayPortfolioValueChange = function() {
   this.deferredEmit('portfolioValueChange', {
-    balance: this.getBalance()
+    balance: this.getBalance(),
+    hodling: this.exposed,
   });
 }
 

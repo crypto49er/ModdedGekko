@@ -167,6 +167,11 @@ Trader.prototype.processAdvice = function(advice) {
   }
 
   let amount;
+  let percentage = advice.percentage ? advice.percentage : 1;
+
+  if (advice.amount) {
+    amount = advice.amount;
+  }
 
   if(direction === 'buy') {
 
@@ -182,7 +187,7 @@ Trader.prototype.processAdvice = function(advice) {
     //   });
     // }
 
-    amount = this.portfolio.currency / this.price * 0.95;
+    //amount = this.portfolio.currency / this.price * 0.95;
 
     log.info(
       'Trader',
@@ -216,7 +221,7 @@ Trader.prototype.processAdvice = function(advice) {
       delete this.activeStopTrigger;
     }
 
-    amount = this.portfolio.asset;
+    amount = this.portfolio.asset/percentage;
 
     log.info(
       'Trader',
