@@ -123,8 +123,8 @@ var pipeline = (settings) => {
                 emitterMessage += sub.emitters.join(', ');
                 emitterMessage += ' ] are disabled.';
               } else {
-                emitterMessage += 'the emitting plugin (' + sub.emitter;
-                emitterMessage += ')is disabled.'
+                emitterMessage = 'the emitting plugin (' + sub.emitter;
+                emitterMessage += ') is disabled.'
               }
 
               log.error([
