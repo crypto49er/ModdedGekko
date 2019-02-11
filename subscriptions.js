@@ -60,12 +60,16 @@ var subscriptions = [
     handler: 'processTradeCompleted'
   },
   {
-    emitter: 'trader',
+    emitter: ['trader', 'paperTrader'], 
+    // paperTrader never emits cancel trades, but this silents the error message 
+    // that Trading Advisor might malfunction because trader is not enabled
     event: 'tradeCancelled',
     handler: 'processTradeCancelled'
   },
   {
-    emitter: 'trader',
+    emitter: ['trader', 'paperTrader'],
+    // paperTrader never emits errored trades, but this silents the error message 
+    // that Trading Advisor might malfunction because trader is not enabled
     event: 'tradeErrored',
     handler: 'processTradeErrored'
   },
