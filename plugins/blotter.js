@@ -61,7 +61,9 @@ Blotter.prototype.processTradeCompleted = function(trade) {
 
   if (trade.action === 'buy') {
     //time, price, amount, side, fees, value at buy
-    this.outtxt = this.time + "," + trade.effectivePrice.toFixed(2) + "," + trade.amount.toFixed(8) + "," + trade.action + "," + trade.feePercent + "," + this.valueAtBuy;
+    if (trade.effectivePrice && trade.amount) {
+      this.outtxt = this.time + "," + trade.effectivePrice.toFixed(2) + "," + trade.amount.toFixed(8) + "," + trade.action + "," + trade.feePercent + "," + this.valueAtBuy;
+    }
     if (trade.price == 0 || isNaN(trade.price) || trade.amount == 0 || isNaN(trade.amount)) {
       this.outtxt = this.outtxt + "," + ",Trade probably went through but didn't receive correct price/amount info\n";
     } else {
@@ -73,7 +75,9 @@ Blotter.prototype.processTradeCompleted = function(trade) {
   else if (trade.action === 'sell'){
     var sellValue = (this.roundUp(trade.effectivePrice * trade.amount));
     //time, price, amount, side, fees, value at sell
-    this.outtxt = this.time + "," + trade.effectivePrice.toFixed(2) + "," + trade.amount.toFixed(8) + "," + trade.action + "," + trade.feePercent + "," + sellValue + ",";
+    if (trade.effectivePrice && trade.amount) {
+      this.outtxt = this.time + "," + trade.effectivePrice.toFixed(2) + "," + trade.amount.toFixed(8) + "," + trade.action + "," + trade.feePercent + "," + sellValue + ",";
+    }
     if ((trade.price == 0 || isNaN(trade.price)) && (trade.amount == 0|| isNaN(trade.amount))) {
       this.inaccurateData = true;
     }
