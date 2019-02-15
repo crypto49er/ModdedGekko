@@ -1,64 +1,29 @@
-// RSI Layer Buy Sell
+// Test Layer Buy Sell
 // This only works with this modded version of Gekko
 // https://github.com/crypto49er/moddedgekko
-//
-// This strat buys when RSI < 30 and pRSI < RSI
-// This strat sells 50% when RSI < 70 and pRSI > 70
-// This strat sells 50% when RSI < 70 and pRSI > 70 again
-
 
 const log = require('../core/log.js');
-const config = require ('../core/util.js').getConfig();
-const CandleBatcher = require('../core/candleBatcher');
-const RSI = require('../strategies/indicators/RSI.js');
 
 var strat = {};
-var rsi5 = new RSI({ interval: 14 });
-var rsi5History = [];
 var asset = 0;
 var currency = 0;
 var currentPrice = 0;
 var counter = 0;
 var layeredBuyAmount = 0;
+var layeredBuyCounter = 0;
 var layeredSellAmount = 0;
-var highestRSI = 0;
-var candle5 = {};
-var rsiAbove70 = false;
-var buyPrice = 0; // Get it from onTrade
-
-
+var layeredSellCounter = 0;
 
 // Prepare everything our strat needs
 strat.init = function() {
   // your code!
-  this.name = 'RSI Layer Buy Sell';
+  this.name = 'Test Layer Buy Sell';
   this.tradeInitiated = false;
-
-    // since we're relying on batching 1 minute candles into 5 minute candles
-  // lets throw if the settings are wrong
-  if (config.tradingAdvisor.candleSize !== 1) {
-    throw "This strategy must run with candleSize=1";
-  }
-
-  // create candle batchers for 5 minute candles
-  this.batcher5 = new CandleBatcher(5);
-
-  // supply callbacks for 5 minute candle function
-  this.batcher5.on('candle', this.update5);
-
-
-  // Add an indicator even though we won't be using it because
-  // Gekko won't use historical data unless we define the indicator here
-  this.addIndicator('rsi', 'RSI', { interval: this.settings.interval});
 }
 
 // What happens on every new candle?
 strat.update = function(candle) {
   // your code!
-
-    // write 1 minute candle to 5 minute batchers
-    this.batcher5.write([candle]);
-    this.batcher5.flush();
 
     // Send message that bot is still working after 24 hours (assuming minute candles)
     counter++;
@@ -70,26 +35,11 @@ strat.update = function(candle) {
     currentPrice = candle.close;
 }
 
-strat.update5 = function(candle) {
-  rsi5.update(candle);
+// For debugging purposes.
+strat.log = function() {
+  // your code!
 
-  candle5 = this.batcher5.calculatedCandles[0];
 
-  // We only need to store RSI for 10 candles
-  rsi5History.push(rsi5.result);
-  if (rsi5History.length > 10) {
-    rsi5History.shift();
-  }
-
-  highestRSI = 0;
-  for (i=5;i<=rsi5History.length-1;i++){
-    if(rsi5History[i] > highestRSI) {
-      highestRSI = rsi5History[i];
-    }
-  }
-  
-  //Send price and RSI to console every 5 minutes
-  //log.info('Price', currentPrice, 'SMA', sma5.result, 'RSI', rsi5.result.toFixed(2));
 }
 
 // Based on the newly calculated
@@ -98,49 +48,30 @@ strat.update5 = function(candle) {
 strat.check = function(candle) {
   // your code!
 
-  // Buy if RSI < 30 and RSI > pRSI
-  if (!this.tradeInitiated && rsi5.result < 30 && rsi5.result > rsi5History[8]) { // Add logic to use other indicators
-    layeredBuyAmount =  layeredBuyAmount > currency ? currency : layeredBuyAmount; 
+  log.info('layeredBuy', layeredBuyAmount,
+  'layer Buy counter', layeredBuyCounter,
+  'layer Sell Amount', layeredSellAmount,
+  'layer Sell Counter', layeredSellCounter);
+  // If there are no active trades, send signal
+  if (!this.tradeInitiated && layeredSellCounter == 0 && layeredBuyCounter > 0 && currency >= layeredBuyAmount) { // Add logic to use other indicators
+    layeredBuyCounter--;
+    // New method with trailing stoploss
     this.advice({ direction: 'long',
       trigger: {
         type: 'trailingStop',
-        trailPercentage: 3
+        trailPercentage: 1
       },
       amount: layeredBuyAmount,
     });
-    rsiAbove70 = false;
+
+
   }
 
-  // Sell if RSI > 85
-  if (!this.tradeInitiated && rsi5.result > 85) {
-    layeredSellAmount = layeredSellAmount > asset ? asset : layeredSellAmount;
+  if (!this.tradeInitiated && layeredBuyCounter == 0 && layeredSellCounter > 0) {
     this.advice({ direction: 'short',
         amount: layeredSellAmount,
     });
-  }
-
-  // Sell if pRSI > 70 & RSI < 70
-  if (!this.tradeInitiated && rsi5History[8] > 70 && rsi5.result < 70) {
-    layeredSellAmount = layeredSellAmount > asset ? asset : layeredSellAmount;
-    this.advice({ direction: 'short',
-        amount: layeredSellAmount,
-    });
-    rsiAbove70 = true;
-  }
-
-  // Sell if rsiAbove70 is true & RSI > 70 & pRSI > RSI
-  if (!this.tradeInitiated && rsiAbove70 && rsi5History[8] > rsi5.result && rsi5.result > 70) {
-    layeredSellAmount = layeredSellAmount > asset ? asset : layeredSellAmount;
-    this.advice({ direction: 'short',
-        amount: layeredSellAmount,
-    });
-    rsiAbove70 = false;
-  }
-
-  // Sell all if 2% stop loss
-  if (!this.tradeInitiated && currentPrice < buyPrice * 0.98) {
-    this.advice('short');
-    rsiAbove70 = false;
+    layeredSellCounter--;
   }
   
 
@@ -175,10 +106,6 @@ strat.onPendingTrade = function(pendingTrade) {
 // }
 strat.onTrade = function(trade) {
   this.tradeInitiated = false;
-  if (trade.action == 'buy'){
-    buyPrice = trade.price;
-  }
-
   
 }
 
@@ -212,12 +139,15 @@ strat.onPortfolioChange = function(portfolio) {
   // Divide buy in 4 only if we don't hold assets
   // If we are holding assets, it means we began the layer buy process
   // and dividing again is like buying 1/4th of 75% 
-  if (asset == 0) {
+  if (asset == 0 && layeredBuyCounter == 0) {
     layeredBuyAmount = currency / 4;
+    layeredBuyCounter = 4;
   }
 
-  if (currency < 0.01) {
+  // 
+  if (layeredBuyAmount > currency && layeredSellCounter == 0) {
     layeredSellAmount = asset / 2;
+    layeredSellCounter = 2;
   }
 
 }

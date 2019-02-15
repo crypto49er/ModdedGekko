@@ -167,7 +167,6 @@ Trader.prototype.processAdvice = function(advice) {
   }
 
   let amount;
-  let percentage = advice.percentage ? advice.percentage : 1;
 
   if (advice.amount) {
     amount = advice.amount;
@@ -221,7 +220,7 @@ Trader.prototype.processAdvice = function(advice) {
       delete this.activeStopTrigger;
     }
 
-    amount = this.portfolio.asset/percentage;
+    amount = this.portfolio.asset > advice.amount ? advice.amount : this.portfolio.asset;
 
     log.info(
       'Trader',
