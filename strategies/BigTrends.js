@@ -34,12 +34,13 @@ const SMA = require('../strategies/indicators/SMA.js');
 
 // Let's create our own strat
 var strat = {};
+var asset = 0;
+var currency = 0;
 var buyPrice = 0.0;
 var currentPrice = 0.0;
 var rsi5 = new RSI({ interval: 14 });
 var dpo5 = new DPO(50);
 var sma5 = new SMA(200);
-var advised = false;
 var counter = 0;
 var rsi5History = [];
 var rsi5Lowest = 100;
@@ -52,6 +53,7 @@ var message = '';
 // Prepare everything our method needs
 strat.init = function() {
   this.name = 'Big Trends';
+  this.tradeInitiated = false;
   this.requiredHistory = config.tradingAdvisor.historySize;
 
   // since we're relying on batching 1 minute candles into 5 minute candles
@@ -116,58 +118,66 @@ strat.check = function() {
   
   // Buy 
   // RSI > 19.5 in last 10 candles and rsi[8] < overSold and rsi[9] > overSold 
-  if (!advised && !stopLossed && rsi5Lowest > 19.5 && rsi5History[8] < this.settings.oversold && rsi5History[9] > this.settings.oversold) {
+  if (!this.tradeInitiated && !stopLossed && rsi5Lowest > 19.5 && rsi5History[8] < this.settings.oversold && rsi5History[9] > this.settings.oversold) {
       this.buy("RSI Buy - Exited Oversold");
   }
 
   // Buy if DPO > 0 and stopLossed, turn off stopLossed
-  if (!advised && stopLossed && dpo5.result > 0) {
+  if (!this.tradeInitiated && stopLossed && dpo5.result > 0) {
     this.buy("DPO Buy - Above 0");
     stopLossed = false;
   }
 
   // Sell
   // If current Price < SMA 200, sell as soon as RSI starts falling after hitting 70
-  if (advised && currentPrice < sma5.result && rsi5History[8] > 70 && rsi5History[8] > rsi5.result ) {
+  if (!this.tradeInitiated && asset * currentPrice > currency && currentPrice < sma5.result && rsi5History[8] > 70 && rsi5History[8] > rsi5.result ) {
     this.sell('Sell - Below 200 SMA and RSI > 70 but falling');
   }
 
   // If > SMA 200, don't sell until it goes above SMA 200 * 1.01, 
   // enable stop loss so if current price < buy price, sell
-  if (advised && !wentAbove70 && currentPrice > sma5.result && rsi5.result > 70) {
+  if (asset * currentPrice > currency && !wentAbove70 && currentPrice > sma5.result && rsi5.result > 70) {
     wentAbove70 = true;
   }
 
   // Sell if went above 70, but price fell back below SMA 200 and price < buy price
-  if (advised && wentAbove70 && currentPrice < sma5.result && currentPrice < buyPrice) {
+  if (!this.tradeInitiated && asset * currentPrice > currency && wentAbove70 && currentPrice < sma5.result && currentPrice < buyPrice) {
     this.sell('Sell - Hit 200 SMA then fell');
   }
 
   // Sell if current price > 200 SMA * 1.01 and rsi[8] > overBought and rsi[9] < overBought
-  if (advised && currentPrice > sma5.result * 1.01 && rsi5History[8] > this.settings.overbought && rsi5History[9] < this.settings.overbought) {
+  if (!this.tradeInitiated && asset * currentPrice > currency && currentPrice > sma5.result * 1.01 && rsi5History[8] > this.settings.overbought && rsi5History[9] < this.settings.overbought) {
     this.sell("Sell - Take Profit - Price > 200 SMA Up and RSI was > 70");
   }
 
   // Sell when:
   // current price is 10% lower than buy price
-  if (advised && currentPrice < buyPrice * 0.99){
+  if (!this.tradeInitiated && currentPrice < buyPrice * 0.99){
     this.sell("1% stop loss");
     stopLossed = true;
   }
 
 }
 
+// This is called when trader.js initiates a 
+// trade. Perfect place to put a block so your
+// strategy won't issue more trader orders
+// until this trade is processed.
+strat.onPendingTrade = function(pendingTrade) {
+  this.tradeInitiated = true;
+
+}
+
 strat.onTrade = function(trade) {
+  this.tradeInitiated = false;
   if (trade.action == 'buy') {
     buyPrice = trade.price;
-    advised = true;
     log.remote(config.watch.asset, '/', config.watch.currency, 'Buy', trade.price, 
     '\nStrategy:', this.name, '\n', message );
   }
 
   if (trade.action == 'sell') {
     buyPrice = 0;
-    advised = false;
     if (trade.price < buyPrice) {
       losingTrades++;
     } else {
@@ -187,6 +197,27 @@ strat.onTrade = function(trade) {
     log.remote(config.watch.asset, '/', config.watch.currency, 'Sell', trade.price, 
     '\nStrategy: ', this.name, '\n', message );
   }
+}
+
+// Trades that didn't complete with a buy/sell
+strat.onTerminatedTrades = function(terminatedTrades) {
+  log.info('Trade failed. Reason:', terminatedTrades.reason);
+  this.tradeInitiated = false;
+}
+
+strat.onPortfolioChange = function(portfolio) {
+
+  // Sell if we start out holding a bag
+  // We determine this as currency and asset starts out
+  // at 0 before we get the info from the exchange. 
+  if (asset == 0 && currency == 0 && portfolio.asset > 0) {
+    log.info('Starting with a sell as Gekko probably crashed after a buy')
+    //this.advice('short');
+  }
+
+  asset = portfolio.asset;
+  currency = portfolio.currency;
+
 }
 
 // Sample of how a sell message looks like (sent from onTrade method)
@@ -217,7 +248,6 @@ strat.sell = function(reason) {
     message = reason;
   }
   this.advice('short');
-  advised = false;
   wentAbove70 = false;
 }
 
@@ -238,8 +268,7 @@ strat.buy = function(reason) {
   if (reason == "Manual buy order from telegram") {
     message = reason;
   }
-  this.advice('long');
-  advised = true; // Will confirm this using onTrade
+  this.advice('long');  
   buyPrice = currentPrice; // Will update this to correct buy price using onTrade
 }
 
