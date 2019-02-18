@@ -50,5 +50,6 @@ config-*.js
 private-*.js
 private-*.toml
 SECRET-api-keys.json
+*-balanceTracker.json
 exchange/nusadua
 .vscode/launch.json

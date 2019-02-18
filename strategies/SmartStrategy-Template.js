@@ -2,17 +2,46 @@
 // This only works with this modded version of Gekko
 // https://github.com/crypto49er/moddedgekko
 
+const fs = require('fs');
 const log = require('../core/log.js');
 
 var strat = {};
 var asset = 0;
 var currency = 0;
 var counter = 0;
+var fiatLimit = 100;
+var assetLimit = 0.02857 // $100 USD if Bitcoin is $3500
 
 // Prepare everything our strat needs
 strat.init = function() {
   // your code!
   this.tradeInitiated = false;
+  this.name = 'SmartStrategy-Template';
+
+  fs.readFile(this.name + '-balanceTracker.json', (err, contents) => {
+    var fileObj = {};
+    if (err) {
+      log.warn('No file with the name', this.name + '-balanceTracker.json', 'found. Creating new tracker file');
+      fileObj = {
+        assetLimit: assetLimit,
+        fiatLimit: fiatLimit,
+      };
+      fs.appendFile(this.name + '-balanceTracker.json', JSON.stringify(fileObj), (err) => {
+        if(err) {
+          log.error('Unable to create balance tracker file');
+        }
+      });
+    } else {
+      try {
+        fileObj = JSON.parse(contents)
+        assetLimit = fileObj.assetLimit;
+        fiatLimit = fileObj.fiatLimit;
+      }
+      catch (err) {
+        log.error('Tracker file empty or corrupted');
+      }
+    }
+  });
 }
 
 // What happens on every new candle?
@@ -25,6 +54,8 @@ strat.update = function(candle) {
       log.remote(this.name, ' - Bot is still working.');
       counter = 0;
     }
+
+log.info('Price:', candle.close);
 
 }
 
@@ -42,20 +73,48 @@ strat.check = function(candle) {
   // your code!
 
   // If there are no active trades, send signal
-  if (!this.tradeInitiated) { // Add logic to use other indicators
-    
-    //Old method to send buy signal
-    this.advice('long');
+  // if (!this.tradeInitiated && candle.close > 3500 && candle.close < 3600) { // Add logic to use other indicators
+  //   // //Old method to send buy signal
+  //   // this.advice('long');
 
-    // New method with trailing stoploss
-    this.advice({ direction: 'long',
-      trigger: {
-        type: 'trailingStop',
-        trailPercentage: 1
-      },
+  //   // New method with trailing stoploss
+  //   this.advice({ direction: 'long',
+  //     trigger: {
+  //       type: 'trailingStop',
+  //       trailPercentage: 1
+  //     },
+  //     amount: currency > fiatLimit ? fiatLimit : currency,
+  //   });
+
+  // }
+
+  // if (!this.tradeInitiated && candle. close > 3600 ) {
+  //   this.advice({
+  //     direction: 'short',
+  //     amount: asset > assetLimit ? assetLimit : asset,
+  //   });
+  // }
+
+  
+}
+
+// Consolidate code for buy/sells into functions
+// to enable balance limit ability 
+// TODO: Store balance in a file for retrieval
+// in case of crash 
+strat.buy = function(reason) {
+
+}
+
+strat.sell = function(reason){
+  if (assetPurchasedFromLastTrade > 0) {
+    this.advice({
+      direction: 'short',
+      amount: assetPurchasedFromLastTrade,
     });
+  } else {
+    this.advice('short');
   }
-
 
 }
 
@@ -88,6 +147,22 @@ strat.onPendingTrade = function(pendingTrade) {
 strat.onTrade = function(trade) {
   this.tradeInitiated = false;
   
+  if (trade.action == 'buy') {
+    assetLimit = fiatLimit / trade.price;
+  }
+
+  if (trade.action == 'sell') {
+    fiatLimit = trade.amount * trade.price;
+  }
+  var fileObj = {
+    assetLimit: assetLimit,
+    fiatLimit: fiatLimit,
+  }
+  fs.writeFile(this.name + '-balanceTracker.json', JSON.stringify(fileObj), (err) => {
+    if(err) {
+      log.error('Unable to write to balance tracker file');
+    }
+  });
 }
 
 // Trades that didn't complete with a buy/sell
@@ -121,9 +196,14 @@ strat.onPortfolioChange = function(portfolio) {
 
 // This reports the portfolio value as the price of the asset
 // fluctuates. Reports every minute when you are hodling.
+// This is how the portfolioValue object looks like:
+// {
+//   balance: [currency + (asset * current price)]
+//   hodling: [true if hodling more than 10% of asset, else false]
+//   
+// }
 strat.onPortfolioValueChange = function(portfolioValue) {
-  log.info('new portfolio value', portfolioValue.balance);
-  log.info('Holding more than 10% of asset =', portfolioValue.hodling);
+
 }
 
 // Optional for executing code
@@ -156,12 +236,21 @@ strat.onCommand = function(cmd) {
   }
   if (command == 'buy') {
     cmd.handled = true;
-    this.advice('long');
+    this.advice({ direction: 'long',
+      trigger: {
+        type: 'trailingStop',
+        trailPercentage: 1
+      },
+      amount: currency > fiatLimit ? fiatLimit : currency,
+    });
   
   }
   if (command == 'sell') {
     cmd.handled = true;
-    this.advice('short');
+    this.advice({
+      direction: 'short',
+      amount: asset > assetLimit ? assetLimit : asset,
+    });
   }
 }
 
