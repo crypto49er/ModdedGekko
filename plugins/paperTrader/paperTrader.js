@@ -112,7 +112,7 @@ PaperTrader.prototype.updatePosition = function(advice) {
     let portion = this.portfolio.asset > advice.amount ? advice.amount : this.portfolio.asset;
     cost = (1 - this.fee) * (portion * this.price);
     this.portfolio.currency += this.extractFee(portion * this.price);
-    amount = this.portfolio.currency / this.price;
+    amount = portion;
     this.portfolio.asset = this.portfolio.asset - portion;
 
     this.exposed = false;
@@ -189,9 +189,9 @@ PaperTrader.prototype.processAdvice = function(advice) {
   this.deferredEmit('tradeCompleted', {
     id: this.tradeId,
     adviceId: advice.id,
-    action,
-    cost,
-    amount,
+    action: action,
+    cost: cost,
+    amount: amount,
     price: this.price,
     portfolio: this.portfolio,
     balance: this.getBalance(),
@@ -245,7 +245,7 @@ PaperTrader.prototype.onStopTrigger = function() {
     date
   });
 
-  const { cost, amount, effectivePrice } = this.updatePosition('short');
+  const { cost, amount, effectivePrice } = this.updatePosition(advice);
 
   this.relayPortfolioChange();
   this.relayPortfolioValueChange();
@@ -253,9 +253,9 @@ PaperTrader.prototype.onStopTrigger = function() {
   this.deferredEmit('tradeCompleted', {
     id: this.tradeId,
     adviceId: this.activeStopTrigger.adviceId,
-    action: 'sell',
-    cost,
-    amount,
+    action: action,
+    cost: cost,
+    amount: amount,
     price: this.price,
     portfolio: this.portfolio,
     balance: this.getBalance(),
