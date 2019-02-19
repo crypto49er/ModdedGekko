@@ -1,4 +1,9 @@
 // Smart Strategy Template
+// This template allows your strategy to do the following:
+// - Know the starting asset/currency for the trade pair in your portfolio
+// - Know when Gekko sends a trade out so it won't send another until that trade is completed
+// - Know when a trade completes or errors out
+// - Know the balance limit set for trading and recover that information after a crash
 // This only works with this modded version of Gekko
 // https://github.com/crypto49er/moddedgekko
 

@@ -169,7 +169,7 @@ Trader.prototype.processAdvice = function(advice) {
   let amount;
 
   if (advice.amount) {
-    amount = advice.amount;
+    amount = advice.amount / this.price;
   }
 
   if(direction === 'buy') {
@@ -264,6 +264,10 @@ Trader.prototype.createOrder = function(side, amount, advice, id) {
     balance: this.balance
   });
 
+  // TODO 
+  // Remove percentage from advice
+  // Add boolean limit
+  // Use boolean here 
   this.order = this.broker.createOrder(type, side, amount);
 
   this.order.on('fill', f => log.info('[ORDER] partial', side, 'fill, total filled:', f));
