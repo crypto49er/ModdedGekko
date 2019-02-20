@@ -3,6 +3,7 @@
 // https://github.com/crypto49er/moddedgekko
 //
 
+const fs = require('fs');
 const log = require('../core/log.js');
 const config = require ('../core/util.js').getConfig();
 const CandleBatcher = require('../core/candleBatcher');
@@ -10,28 +11,24 @@ const RSI = require('../strategies/indicators/RSI.js');
 
 var strat = {};
 var rsi5 = new RSI({ interval: 14 });
-var rsi5History = [];
 var asset = 0;
 var currency = 0;
 var currentPrice = 0;
 var counter = 0;
-var layeredBuyAmount = 0;
-var layeredSellAmount = 0;
-var highestRSI = 0;
-var candle5 = {};
-var rsiAbove70 = false;
 var buyPrice = 0; // Get it from onTrade
 var watchPrice = 0.0;
 var lowestPrice = 0.0;
 var sellPrice = 0.0;
 var advised = false;
 
+var buyLimit = 0.04748810; // How much BTC to use to buy ONT $250 CAD value
+var sellLimit = 272.86179117; // ONT based on $250 CAD of BTC
 
 
 // Prepare everything our strat needs
 strat.init = function() {
   // your code!
-  this.name = 'RSI Layer Buy Sell';
+  this.name = 'StepGains';
   this.tradeInitiated = false;
 
     // since we're relying on batching 1 minute candles into 5 minute candles
@@ -50,6 +47,33 @@ strat.init = function() {
   // Add an indicator even though we won't be using it because
   // Gekko won't use historical data unless we define the indicator here
   this.addIndicator('rsi', 'RSI', { interval: this.settings.interval});
+
+  fs.readFile(this.name + '-balanceTracker.json', (err, contents) => {
+    var fileObj = {};
+    if (err) {
+      log.warn('No file with the name', this.name + '-balanceTracker.json', 'found. Creating new tracker file');
+      fileObj = {
+      sellLimit: sellLimit,
+      buyLimit: buyLimit,
+      };
+      fs.appendFile(this.name + '-balanceTracker.json', JSON.stringify(fileObj), (err) => {
+      if(err) {
+        log.error('Unable to create balance tracker file');
+      }
+      });
+    } else {
+      try {
+      fileObj = JSON.parse(contents)
+      sellLimit = fileObj.sellLimit;
+      buyLimit = fileObj.buyLimit;
+      }
+      catch (err) {
+      log.error('Tracker file empty or corrupted');
+      }
+    }
+  });
+
+  
 }
 
 // What happens on every new candle?
@@ -78,21 +102,6 @@ strat.update5 = function(candle) {
 
   candle5 = this.batcher5.calculatedCandles[0];
 
-  // We only need to store RSI for 10 candles
-  rsi5History.push(rsi5.result);
-  if (rsi5History.length > 10) {
-    rsi5History.shift();
-  }
-
-  highestRSI = 0;
-  for (i=5;i<=rsi5History.length-1;i++){
-    if(rsi5History[i] > highestRSI) {
-      highestRSI = rsi5History[i];
-    }
-  }
-  
-  //Send price and RSI to console every 5 minutes
-  //log.info('Price', currentPrice, 'SMA', sma5.result, 'RSI', rsi5.result.toFixed(2));
 }
 
 // Based on the newly calculated
@@ -110,14 +119,17 @@ if(candle.close <= watchPrice){
 if(candle.close > lowestPrice && !advised && !this.tradeInitiated){
     this.advice({
       direction: 'long',
-      amount: 100,
+      amount: buyLimit,
     });
     log.debug('Buying at', candle.close);
     sellPrice = candle.close * 1.03;
     advised = true;
 }
 if(candle.close > sellPrice && watchPrice != 0 && lowestPrice != 0 && advised && !this.tradeInitiated){
-    this.advice("short");
+    this.advice({
+      direction: 'short',
+      amount: sellLimit,
+    });
     log.debug('Selling at', candle.close);
     watchPrice = 0;
     lowestPrice = 0;
@@ -157,9 +169,24 @@ strat.onPendingTrade = function(pendingTrade) {
 // }
 strat.onTrade = function(trade) {
   this.tradeInitiated = false;
-  if (trade.action == 'buy'){
+  if (trade.action == 'buy') {
     buyPrice = trade.price;
+    sellLimit = buyLimit / trade.price;
   }
+
+  if (trade.action == 'sell') {
+    log.info('Bought at', buyPrice, 'Sold at', trade.price);
+    buyLimit = trade.amount * trade.price;
+  }
+  var fileObj = {
+    sellLimit: sellLimit,
+    buyLimit: buyLimit,
+  }
+  fs.writeFile(this.name + '-balanceTracker.json', JSON.stringify(fileObj), (err) => {
+  if(err) {
+    log.error('Unable to write to balance tracker file');
+  }
+  });
 
   
 }
@@ -183,24 +210,13 @@ strat.onPortfolioChange = function(portfolio) {
   // Sell if we start out holding a bag
   // We determine this as currency and asset starts out
   // at 0 before we get the info from the exchange. 
-  if (asset == 0 && currency == 0 && portfolio.asset > 0) {
-    log.info('Starting with a sell as Gekko probably crashed after a buy')
-    //this.advice('short');
-  }
+  // if (asset == 0 && currency == 0 && portfolio.asset > 0) {
+  //   log.info('Starting with a sell as Gekko probably crashed after a buy')
+  //   this.advice('short');
+  // }
 
   asset = portfolio.asset;
   currency = portfolio.currency;
-
-  // Divide buy in 4 only if we don't hold assets
-  // If we are holding assets, it means we began the layer buy process
-  // and dividing again is like buying 1/4th of 75% 
-  if (asset == 0) {
-    layeredBuyAmount = currency / 4;
-  }
-
-  if (currency < 0.01) {
-    layeredSellAmount = asset / 2;
-  }
 
 }
 
@@ -241,12 +257,18 @@ strat.onCommand = function(cmd) {
   }
   if (command == 'buy') {
     cmd.handled = true;
-    this.advice('long');
+    this.advice({
+      direction: 'long',
+      amount: buyLimit,
+    });
   
   }
   if (command == 'sell') {
     cmd.handled = true;
-    this.advice('short');
+    this.advice({
+      direction: 'short',
+      amount: sellLimit,
+    });
   }
 }
 
