@@ -13,6 +13,7 @@
 */
 
 // req's
+const fs = require('fs');
 const log = require('../core/log.js');
 const config = require('../core/util.js').getConfig();
 const store = config.currentIndicatorValues;
@@ -31,6 +32,9 @@ var myADX = new ADX(config.RSI_BULL_BEAR_ADX_TF.ADX.adx);
 
 var rsi, adx, advised = false, counter = 0;
 var countdownForCheckIn = 1440; // 288 - 5 Minute candles = 1 day
+
+var fiatLimit = 0.04748810;
+var assetLimit = 272.86179117; // ONT based on $250 CAD of BTC
 
 // strategy
 var strat = {
@@ -86,6 +90,31 @@ var strat = {
 		{
 			log.warn("*** WARNING *** Your Warmup period is lower then SMA_long. If Gekko does not download data automatically when running LIVE the strategy will default to BEAR-mode until it has enough data.");
 		}
+
+		fs.readFile(this.name + '-balanceTracker.json', (err, contents) => {
+			var fileObj = {};
+			if (err) {
+			  log.warn('No file with the name', this.name + '-balanceTracker.json', 'found. Creating new tracker file');
+			  fileObj = {
+				assetLimit: assetLimit,
+				fiatLimit: fiatLimit,
+			  };
+			  fs.appendFile(this.name + '-balanceTracker.json', JSON.stringify(fileObj), (err) => {
+				if(err) {
+				  log.error('Unable to create balance tracker file');
+				}
+			  });
+			} else {
+			  try {
+				fileObj = JSON.parse(contents)
+				assetLimit = fileObj.assetLimit;
+				fiatLimit = fileObj.fiatLimit;
+			  }
+			  catch (err) {
+				log.error('Tracker file empty or corrupted');
+			  }
+			}
+		  });
 		
 	}, // init()
 	
@@ -235,7 +264,23 @@ var strat = {
 	}, // check()
 
 	onTrade: function(trade){
-		log.info(trade);
+		//log.info(trade);
+		if (trade.action == 'buy') {
+			assetLimit = fiatLimit / trade.price;
+		  }
+		
+		  if (trade.action == 'sell') {
+			fiatLimit = trade.amount * trade.price;
+		  }
+		  var fileObj = {
+			assetLimit: assetLimit,
+			fiatLimit: fiatLimit,
+		  }
+		  fs.writeFile(this.name + '-balanceTracker.json', JSON.stringify(fileObj), (err) => {
+			if(err) {
+			  log.error('Unable to write to balance tracker file');
+			}
+		  });
 	},
 
 	onCommand: function(cmd){
@@ -309,11 +354,20 @@ var strat = {
 		}
 		if (command == 'buy') {
 		  cmd.handled = true;
-		  this.advice('long');
+		  this.advice({ direction: 'long',
+		  trigger: {
+			type: 'trailingStop',
+			trailPercentage: 1
+		  },
+		  amount: currency > fiatLimit ? fiatLimit : currency,
+		});
 		}
 		if (command == 'sell') {
 		  cmd.handled = true;
-		  this.advice('short');
+		  this.advice({
+			direction: 'short',
+			amount: asset > assetLimit ? assetLimit : asset,
+		  });
 		}
     },
 	
@@ -325,7 +379,13 @@ var strat = {
 		{
 			this.resetTrend();
 			this.trend.direction = 'up';
-			this.advice('long');
+			this.advice({ direction: 'long',
+			trigger: {
+			  type: 'trailingStop',
+			  trailPercentage: 1
+			},
+			amount: currency > fiatLimit ? fiatLimit : currency,
+		  });
 			if( this.debug ) log.info('Going long');
 		}
 		
@@ -345,7 +405,10 @@ var strat = {
 		{
 			this.resetTrend();
 			this.trend.direction = 'down';
-			this.advice('short');
+			this.advice({
+				direction: 'short',
+				amount: asset > assetLimit ? assetLimit : asset,
+			  });
 			if( this.debug ) log.info('Going short');
 		}
 		
