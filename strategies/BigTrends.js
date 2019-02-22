@@ -177,7 +177,6 @@ strat.onTrade = function(trade) {
   }
 
   if (trade.action == 'sell') {
-    buyPrice = 0;
     if (trade.price < buyPrice) {
       losingTrades++;
     } else {
@@ -196,6 +195,7 @@ strat.onTrade = function(trade) {
 
     log.remote(config.watch.asset, '/', config.watch.currency, 'Sell', trade.price, 
     '\nStrategy: ', this.name, '\n', message );
+    buyPrice = 0;
   }
 }
 
