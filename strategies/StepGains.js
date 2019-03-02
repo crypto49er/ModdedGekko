@@ -17,10 +17,13 @@ var currentPrice = 0;
 var counter = 0;
 var buyPrice = 0; // Get it from onTrade
 var watchPrice = 0.0;
-var lowestPrice = 0.0;
-var sellPrice = 0.0;
+var lowestPrice = Infinity;
+var sellPrice = Infinity;
 var advised = false;
+var candle5 = {};
 
+
+/*** Set Buy/Sell Limits Here */
 var buyLimit = 0.04748810; // How much BTC to use to buy ONT $250 CAD value
 var sellLimit = 272.86179117; // ONT based on $250 CAD of BTC
 
@@ -87,7 +90,7 @@ strat.update = function(candle) {
     // Send message that bot is still working after 24 hours (assuming minute candles)
     counter++;
     if (counter == 1440){
-      log.remote(this.name, ' - Bot is still working.');
+      log.remote(this.name, '- Bot is still working. Will buy when price falls below', lowestPrice, 'and recovers.');
       counter = 0;
     }
 
@@ -116,7 +119,7 @@ strat.check = function(candle) {
 if(candle.close <= watchPrice){
     lowestPrice = candle.close;
 }
-if(candle.close > lowestPrice && !advised && !this.tradeInitiated){
+if(candle5.close > lowestPrice && !advised && !this.tradeInitiated){
     this.advice({
       direction: 'long',
       amount: buyLimit,
@@ -124,18 +127,20 @@ if(candle.close > lowestPrice && !advised && !this.tradeInitiated){
     log.debug('Buying at', candle.close);
     sellPrice = candle.close * 1.03;
     advised = true;
+    return;
 }
-if(candle.close > sellPrice && watchPrice != 0 && lowestPrice != 0 && advised && !this.tradeInitiated){
+if(candle5.close > sellPrice && watchPrice != 0 && lowestPrice != Infinity && advised && !this.tradeInitiated){
     this.advice({
       direction: 'short',
       amount: sellLimit,
     });
     log.debug('Selling at', candle.close);
     watchPrice = 0;
-    lowestPrice = 0;
+    lowestPrice = Infinity;
     buyPrice = 0;
-    sellPrice = 0;
+    sellPrice = Infinity;
     advised = false;
+    return;
 }
 
 
