@@ -12,6 +12,8 @@ const log = require('../core/log.js');
 
 var strat = {};
 var asset = 0;
+var disableTrading = false;
+var lastTraded; 
 var currency = 0;
 var counter = 0;
 var fiatLimit = 100;
@@ -47,6 +49,8 @@ strat.init = function() {
       }
     }
   });
+
+  log.info('Buy Limit', fiatLimit, 'Sell Limit', assetLimit);
 }
 
 // What happens on every new candle?
@@ -56,7 +60,12 @@ strat.update = function(candle) {
     // Send message that bot is still working after 24 hours (assuming minute candles)
     counter++;
     if (counter == 1440){
-      log.remote(this.name, ' - Bot is still working.');
+      if (lastTraded){
+        log.remote(this.name, ' - Bot is still working. \n Last Trade:', lastTraded);
+      } else {
+        log.remote(this.name, ' - Bot is still working.');
+      }
+      
       counter = 0;
     }
 
@@ -77,21 +86,19 @@ strat.log = function() {
 strat.check = function(candle) {
   // your code!
 
-  // If there are no active trades, send signal
-  // if (!this.tradeInitiated && candle.close > 3500 && candle.close < 3600) { // Add logic to use other indicators
-  //   // //Old method to send buy signal
-  //   // this.advice('long');
+ //If there are no active trades, send signal
+  if (!this.tradeInitiated && !disableTrading && candle.close > 3500 && candle.close < 3600) { // Add logic to use other indicators
 
-  //   // New method with trailing stoploss
-  //   this.advice({ direction: 'long',
-  //     trigger: {
-  //       type: 'trailingStop',
-  //       trailPercentage: 1
-  //     },
-  //     amount: currency > fiatLimit ? fiatLimit : currency,
-  //   });
+    // New method with trailing stoploss
+    this.advice({ direction: 'long',
+      trigger: {
+        type: 'trailingStop',
+        trailPercentage: 1
+      },
+      amount: currency > fiatLimit ? fiatLimit : currency,
+    });
 
-  // }
+  }
 
   // if (!this.tradeInitiated && candle. close > 3600 ) {
   //   this.advice({
@@ -103,25 +110,7 @@ strat.check = function(candle) {
   
 }
 
-// Consolidate code for buy/sells into functions
-// to enable balance limit ability 
-// TODO: Store balance in a file for retrieval
-// in case of crash 
-strat.buy = function(reason) {
 
-}
-
-strat.sell = function(reason){
-  if (assetPurchasedFromLastTrade > 0) {
-    this.advice({
-      direction: 'short',
-      amount: assetPurchasedFromLastTrade,
-    });
-  } else {
-    this.advice('short');
-  }
-
-}
 
 // This is called when trader.js initiates a 
 // trade. Perfect place to put a block so your
@@ -168,6 +157,8 @@ strat.onTrade = function(trade) {
       log.error('Unable to write to balance tracker file');
     }
   });
+
+  lastTraded = trade.date.format('l LT');
 }
 
 // Trades that didn't complete with a buy/sell
@@ -256,6 +247,17 @@ strat.onCommand = function(cmd) {
       direction: 'short',
       amount: asset > assetLimit ? assetLimit : asset,
     });
+  }
+  if (command == 'stop') {
+    cmd.handled = true;
+    if (cmd.arguments == 'true') {
+      disableTrading = true;
+      cmd.response = 'Gekko disabled from buying.';
+    }
+    if (cmd.arguments == 'false') {
+      disableTrading = false;
+      cmd.response = 'Gekko buying enabled.';
+    }
   }
 }
 
