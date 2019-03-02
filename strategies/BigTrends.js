@@ -49,6 +49,8 @@ var losingTrades = 0;
 var wentAbove70 = false;
 var stopLossed = false;
 var message = '';
+var fiatLimit = 100;
+var assetLimit = 0.02857 // $100 USD if Bitcoin is $3500
 
 // Prepare everything our method needs
 strat.init = function() {
@@ -119,42 +121,77 @@ strat.check = function() {
   // Buy 
   // RSI > 19.5 in last 10 candles and rsi[8] < overSold and rsi[9] > overSold 
   if (!this.tradeInitiated && !stopLossed && rsi5Lowest > 19.5 && rsi5History[8] < this.settings.oversold && rsi5History[9] > this.settings.oversold) {
-      this.buy("RSI Buy - Exited Oversold");
+    log.info('RSI Buy - Exited Oversold\nRSI History: ' + rsi5History[8] + ', ' + rsi5History[9]);
+    this.advice({ direction: 'long',
+      amount: currency > fiatLimit ? fiatLimit : currency,
+    });
+    buyPrice = currentPrice; 
+    return;
   }
 
   // Buy if DPO > 0 and stopLossed, turn off stopLossed
   if (!this.tradeInitiated && stopLossed && dpo5.result > 0) {
-    this.buy("DPO Buy - Above 0");
+    log.info('DPO Buy - Above 0\nDPO: ' + dpo5.result.toFixed(2));
+    this.advice({ direction: 'long',
+      amount: currency > fiatLimit ? fiatLimit : currency,
+    });
+    buyPrice = currentPrice; 
     stopLossed = false;
+    return;
   }
 
   // Sell
   // If current Price < SMA 200, sell as soon as RSI starts falling after hitting 70
   if (!this.tradeInitiated && asset * currentPrice > currency && currentPrice < sma5.result && rsi5History[8] > 70 && rsi5History[8] > rsi5.result ) {
-    this.sell('Sell - Below 200 SMA and RSI > 70 but falling');
+    log.info('Sell - Below 200 SMA and RSI > 70 but falling\n200 SMA: ' + sma5.result + ', RSI History: ' + rsi5History[8] + ', ' + rsi5History[9]);
+    this.advice({
+      direction: 'short',
+      amount: asset > assetLimit ? assetLimit : asset,
+    });
+    wentAbove70 = false;
+    return;
   }
 
   // If > SMA 200, don't sell until it goes above SMA 200 * 1.01, 
   // enable stop loss so if current price < buy price, sell
   if (asset * currentPrice > currency && !wentAbove70 && currentPrice > sma5.result && rsi5.result > 70) {
     wentAbove70 = true;
+    return;
   }
 
   // Sell if went above 70, but price fell back below SMA 200 and price < buy price
   if (!this.tradeInitiated && asset * currentPrice > currency && wentAbove70 && currentPrice < sma5.result && currentPrice < buyPrice) {
-    this.sell('Sell - Hit 200 SMA then fell');
+    log.info('Sell - Hit 200 SMA then fell\n200 SMA: ' + sma5.result);
+    this.advice({
+      direction: 'short',
+      amount: asset > assetLimit ? assetLimit : asset,
+    });
+    wentAbove70 = false;
+    return;
   }
 
   // Sell if current price > 200 SMA * 1.01 and rsi[8] > overBought and rsi[9] < overBought
   if (!this.tradeInitiated && asset * currentPrice > currency && currentPrice > sma5.result * 1.01 && rsi5History[8] > this.settings.overbought && rsi5History[9] < this.settings.overbought) {
-    this.sell("Sell - Take Profit - Price > 200 SMA Up and RSI was > 70");
+    log.info('Sell - Take Profit - Price > 200 SMA Up and RSI was > 70\n200 SMA Moved Up: ' + (sma5.result * 1.01) + ', RSI History: ' + rsi5History[8] + ', ' + rsi5History[9]);
+    this.advice({
+      direction: 'short',
+      amount: asset > assetLimit ? assetLimit : asset,
+    });
+    wentAbove70 = false;
+    return;
   }
 
   // Sell when:
   // current price is 10% lower than buy price
   if (!this.tradeInitiated && currentPrice < buyPrice * 0.99){
-    this.sell("1% stop loss");
+    log.info('1% stop loss\nStop Loss Price: ' + (buyPrice* 0.99));
+    this.advice({
+      direction: 'short',
+      amount: asset > assetLimit ? assetLimit : asset,
+    });
     stopLossed = true;
+    wentAbove70 = false;
+    return;
   }
 
 }
@@ -220,58 +257,6 @@ strat.onPortfolioChange = function(portfolio) {
 
 }
 
-// Sample of how a sell message looks like (sent from onTrade method)
-//
-// ETH/USD Sell $xx.yy
-// Strategy: Big Trends
-// Sell - Below 200 SMA and RSI > 70 but falling
-// 200 SMA: $ww.zz, RSI History: 72.81, 70.22
-// Bought at: $aa.bb
-// Sold at: $cc.dd
-// Gain/Loss: $ee.ff
-// Winning Trades: x
-// Losing Trades: y
-strat.sell = function(reason) {
-  if (reason == "Sell - Below 200 SMA and RSI > 70 but falling") {
-    message = reason + '\n200 SMA: ' + sma5.result + ', RSI History: ' + rsi5History[8] + ', ' + rsi5History[9];  
-  }
-  if (reason == "Sell - Hit 200 SMA then fell") {
-    message = reason + '\n200 SMA: ' + sma5.result;
-  }
-  if (reason == "Sell - Take Profit - Price > 200 SMA Up and RSI was > 70") {
-    message = reason + '\n200 SMA Moved Up: ' + (sma5.result * 1.01) + ', RSI History: ' + rsi5History[8] + ', ' + rsi5History[9];  
-  }
-  if (reason == "1% stop loss") {
-    message = reason + '\nStop Loss Price: ' + (buyPrice* 0.99);
-  }
-  if (reason == "Manual sell order from telegram") {
-    message = reason;
-  }
-  this.advice('short');
-  wentAbove70 = false;
-}
-
-
-// Sample of how a buy message looks like (sent from onTrade method)
-//
-// ETH/USD Buy $xx.yy
-// Strategy: Big Trends
-// RSI Buy - Exited Oversold
-// RSI History: 28.33, 33.11
-strat.buy = function(reason) {
-  if (reason == "RSI Buy - Exited Oversold") {
-    message = reason + '\nRSI History: ' + rsi5History[8] + ', ' + rsi5History[9];
-  } 
-  if (reason == "DPO Buy - Above 0") {
-    message = reason + '\nDPO: ' + dpo5.result.toFixed(2);
-  }
-  if (reason == "Manual buy order from telegram") {
-    message = reason;
-  }
-  this.advice('long');  
-  buyPrice = currentPrice; // Will update this to correct buy price using onTrade
-}
-
 strat.error = function() {
   log.info('Error function called in strategy.');
   process.exit(-1);
@@ -313,11 +298,20 @@ strat.onCommand = function(cmd) {
   }
   if (command == 'buy') {
   cmd.handled = true;
-  this.buy('Manual buy order from telegram');
+  log.info('Manual buy order from telegram');
+  this.advice({ direction: 'long',
+    amount: currency > fiatLimit ? fiatLimit : currency,
+  });
+  buyPrice = currentPrice;
   }
   if (command == 'sell') {
   cmd.handled = true;
-  this.sell('Manual sell order from telegram');
+  log.info('Manual sell order from telegram');
+  this.advice({
+    direction: 'short',
+    amount: asset > assetLimit ? assetLimit : asset,
+  });
+  wentAbove70 = false;
   }
 }
 
