@@ -6,7 +6,7 @@ const errors = require('../exchangeErrors');
 const retry = require('../exchangeUtils').retry;
 
 const BATCH_SIZE = 100;
-const QUERY_DELAY = 350;
+const QUERY_DELAY = 700;
 
 const marketData = require('./coinbase-markets.json');
 
