@@ -90,7 +90,7 @@ strat.update = function(candle) {
     // Send message that bot is still working after 24 hours (assuming minute candles)
     counter++;
     if (counter == 1440){
-      log.remote(this.name, '- Bot is still working. Will buy when price falls below', lowestPrice, 'and recovers.');
+      log.remote(this.name, '- Bot is still working. Will buy when price closes above ', lowestPrice);
       counter = 0;
     }
 
@@ -124,7 +124,7 @@ if(candle5.close > lowestPrice && !advised && !this.tradeInitiated){
       direction: 'long',
       amount: buyLimit,
     });
-    log.debug('Buying at', candle.close);
+    log.info('Buying at', candle.close);
     sellPrice = candle.close * 1.03;
     advised = true;
     return;
@@ -134,14 +134,15 @@ if(candle5.close > sellPrice && watchPrice != 0 && lowestPrice != Infinity && ad
       direction: 'short',
       amount: sellLimit,
     });
-    log.debug('Selling at', candle.close);
+    log.info('Selling at', candle.close);
     watchPrice = 0;
     lowestPrice = Infinity;
-    buyPrice = 0;
     sellPrice = Infinity;
     advised = false;
     return;
 }
+
+log.debug('Watch Price', watchPrice, 'Lowest Price', lowestPrice, '5 Minute Close', candle5.close);
 
 
 }
