@@ -41,6 +41,7 @@ var currentPrice = 0.0;
 var rsi5 = new RSI({ interval: 14 });
 var dpo5 = new DPO(50);
 var sma5 = new SMA(200);
+var advised = false;
 var counter = 0;
 var rsi5History = [];
 var rsi5Lowest = 100;
@@ -120,7 +121,7 @@ strat.check = function() {
   
   // Buy 
   // RSI > 19.5 in last 10 candles and rsi[8] < overSold and rsi[9] > overSold 
-  if (!this.tradeInitiated && !stopLossed && rsi5Lowest > 19.5 && rsi5History[8] < this.settings.oversold && rsi5History[9] > this.settings.oversold) {
+  if (!this.tradeInitiated && !advised && !stopLossed && rsi5Lowest > 19.5 && rsi5History[8] < this.settings.oversold && rsi5History[9] > this.settings.oversold) {
     log.info('RSI Buy - Exited Oversold\nRSI History: ' + rsi5History[8] + ', ' + rsi5History[9]);
     this.advice({ direction: 'long',
       amount: currency > fiatLimit ? fiatLimit : currency,
@@ -130,7 +131,7 @@ strat.check = function() {
   }
 
   // Buy if DPO > 0 and stopLossed, turn off stopLossed
-  if (!this.tradeInitiated && stopLossed && dpo5.result > 0) {
+  if (!this.tradeInitiated && !advised && stopLossed && dpo5.result > 0) {
     log.info('DPO Buy - Above 0\nDPO: ' + dpo5.result.toFixed(2));
     this.advice({ direction: 'long',
       amount: currency > fiatLimit ? fiatLimit : currency,
@@ -142,7 +143,7 @@ strat.check = function() {
 
   // Sell
   // If current Price < SMA 200, sell as soon as RSI starts falling after hitting 70
-  if (!this.tradeInitiated && asset * currentPrice > currency && currentPrice < sma5.result && rsi5History[8] > 70 && rsi5History[8] > rsi5.result ) {
+  if (!this.tradeInitiated && advised && asset * currentPrice > currency && currentPrice < sma5.result && rsi5History[8] > 70 && rsi5History[8] > rsi5.result ) {
     log.info('Sell - Below 200 SMA and RSI > 70 but falling\n200 SMA: ' + sma5.result + ', RSI History: ' + rsi5History[8] + ', ' + rsi5History[9]);
     this.advice({
       direction: 'short',
@@ -154,13 +155,13 @@ strat.check = function() {
 
   // If > SMA 200, don't sell until it goes above SMA 200 * 1.01, 
   // enable stop loss so if current price < buy price, sell
-  if (asset * currentPrice > currency && !wentAbove70 && currentPrice > sma5.result && rsi5.result > 70) {
+  if (advised && asset * currentPrice > currency && !wentAbove70 && currentPrice > sma5.result && rsi5.result > 70) {
     wentAbove70 = true;
     return;
   }
 
   // Sell if went above 70, but price fell back below SMA 200 and price < buy price
-  if (!this.tradeInitiated && asset * currentPrice > currency && wentAbove70 && currentPrice < sma5.result && currentPrice < buyPrice) {
+  if (!this.tradeInitiated && advised && asset * currentPrice > currency && wentAbove70 && currentPrice < sma5.result && currentPrice < buyPrice) {
     log.info('Sell - Hit 200 SMA then fell\n200 SMA: ' + sma5.result);
     this.advice({
       direction: 'short',
@@ -171,7 +172,7 @@ strat.check = function() {
   }
 
   // Sell if current price > 200 SMA * 1.01 and rsi[8] > overBought and rsi[9] < overBought
-  if (!this.tradeInitiated && asset * currentPrice > currency && currentPrice > sma5.result * 1.01 && rsi5History[8] > this.settings.overbought && rsi5History[9] < this.settings.overbought) {
+  if (!this.tradeInitiated && advised && asset * currentPrice > currency && currentPrice > sma5.result * 1.01 && rsi5History[8] > this.settings.overbought && rsi5History[9] < this.settings.overbought) {
     log.info('Sell - Take Profit - Price > 200 SMA Up and RSI was > 70\n200 SMA Moved Up: ' + (sma5.result * 1.01) + ', RSI History: ' + rsi5History[8] + ', ' + rsi5History[9]);
     this.advice({
       direction: 'short',
@@ -182,8 +183,8 @@ strat.check = function() {
   }
 
   // Sell when:
-  // current price is 10% lower than buy price
-  if (!this.tradeInitiated && currentPrice < buyPrice * 0.99){
+  // current price is 1% lower than buy price
+  if (!this.tradeInitiated && advised && currentPrice < buyPrice * 0.99){
     log.info('1% stop loss\nStop Loss Price: ' + (buyPrice* 0.99));
     this.advice({
       direction: 'short',
@@ -209,11 +210,13 @@ strat.onTrade = function(trade) {
   this.tradeInitiated = false;
   if (trade.action == 'buy') {
     buyPrice = trade.price;
+    advised = true;
     log.remote(config.watch.asset, '/', config.watch.currency, 'Buy', trade.price, 
     '\nStrategy:', this.name, '\n', message );
   }
 
   if (trade.action == 'sell') {
+    advised = false;
     if (trade.price < buyPrice) {
       losingTrades++;
     } else {
