@@ -23,9 +23,9 @@
 // 1% stop loss
 // After stop loss, wait til DPO goes above 0 to enable buy
 
-
-var log = require('../core/log');
-var config = require ('../core/util.js').getConfig();
+const fs = require('fs');
+const log = require('../core/log');
+const config = require ('../core/util.js').getConfig();
 
 const CandleBatcher = require('../core/candleBatcher');
 const RSI = require('../strategies/indicators/RSI.js');
@@ -75,6 +75,31 @@ strat.init = function() {
   // Define the indicator even thought we won't be using it because
   // Gekko will only provide historical data if we define an indicator here
   this.addIndicator('rsi', 'RSI', { interval: this.settings.interval});
+
+  fs.readFile(this.name + '-balanceTracker.json', (err, contents) => {
+    var fileObj = {};
+    if (err) {
+      log.warn('No file with the name', this.name + '-balanceTracker.json', 'found. Creating new tracker file');
+      fileObj = {
+        assetLimit: assetLimit,
+        fiatLimit: fiatLimit,
+      };
+      fs.appendFile(this.name + '-balanceTracker.json', JSON.stringify(fileObj), (err) => {
+        if(err) {
+          log.error('Unable to create balance tracker file');
+        }
+      });
+    } else {
+      try {
+        fileObj = JSON.parse(contents)
+        assetLimit = fileObj.assetLimit;
+        fiatLimit = fileObj.fiatLimit;
+      }
+      catch (err) {
+        log.error('Tracker file empty or corrupted');
+      }
+    }
+  });
 }
 
 // What happens on every new candle?
@@ -237,6 +262,15 @@ strat.onTrade = function(trade) {
     '\nStrategy: ', this.name, '\n', message );
     buyPrice = 0;
   }
+  var fileObj = {
+    assetLimit: assetLimit,
+    fiatLimit: fiatLimit,
+  }
+  fs.writeFile(this.name + '-balanceTracker.json', JSON.stringify(fileObj), (err) => {
+    if(err) {
+      log.error('Unable to write to balance tracker file');
+    }
+  });
 }
 
 // Trades that didn't complete with a buy/sell
