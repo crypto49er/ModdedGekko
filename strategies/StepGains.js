@@ -126,6 +126,7 @@ if(candle5.close > lowestPrice && !advised && !this.tradeInitiated){
     });
     log.info('Buying at', candle.close);
     sellPrice = candle.close * 1.03;
+    log.info('Will sell at', sellPrice);
     advised = true;
     return;
 }
@@ -142,7 +143,7 @@ if(candle5.close > sellPrice && watchPrice != 0 && lowestPrice != Infinity && ad
     return;
 }
 
-log.debug('Watch Price', watchPrice, 'Lowest Price', lowestPrice, '5 Minute Close', candle5.close);
+log.info('Watch', watchPrice, 'Lowest', lowestPrice, 'Close', candle5.close, 'Sell', sellPrice);
 
 
 }
@@ -252,7 +253,11 @@ strat.onCommand = function(cmd) {
   if (command == 'status') {
       cmd.handled = true;
       cmd.response = config.watch.currency + "/" + config.watch.asset +
-      "\nPrice: " + currentPrice;
+      "\nPrice: " + currentPrice +
+      '\nWatch Price: ' + watchPrice + 
+      '\nLowest Price: ' + lowestPrice + 
+      '\n5 Minute Close: ' +  candle5.close +
+      '\nWill sell at: ' + sellPrice;
       
   }
   if (command == 'help') {
