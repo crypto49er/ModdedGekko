@@ -297,6 +297,14 @@ class StickyOrder extends BaseOrder {
 
           const bookSide = this.side === 'buy' ? 'bid' : 'ask';
           // note: might be string VS float
+          if(ticker.ask - ticker.bid > 0.01) {
+            if (this.side === 'buy'){
+              return this.move(this.roundPrice(ticker.ask - 0.01));
+            }
+            if (this.side === 'sell'){
+              return this.move(this.roundPrice(ticker.bid + 0.01));
+            } 
+          }
           if(ticker[bookSide] != this.price) {
             return this.move(this.calculatePrice(ticker));
           }
