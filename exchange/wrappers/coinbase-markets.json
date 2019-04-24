@@ -5,6 +5,8 @@
     "BCH",
     "ETH",
     "LTC",
+    "XLM",
+    "XRP",
     "ZRX"
   ],
   "currencies": [
@@ -21,6 +23,46 @@
       ],
       "minimalOrder": {
         "amount": "0.10000000",
+        "unit": "asset"
+      }
+    },
+    {
+      "pair": [
+        "EUR",
+        "XRP"
+      ],
+      "minimalOrder": {
+        "amount": "1.0000000",
+        "unit": "asset"
+      }
+    },
+    {
+      "pair": [
+        "USD",
+        "XLM"
+      ],
+      "minimalOrder": {
+        "amount": "1.0000000",
+        "unit": "asset"
+      }
+    },
+    {
+      "pair": [
+        "USD",
+        "XRP"
+      ],
+      "minimalOrder": {
+        "amount": "1.0000000",
+        "unit": "asset"
+      }
+    },
+    {
+      "pair": [
+        "EUR",
+        "XLM"
+      ],
+      "minimalOrder": {
+        "amount": "1.0000000",
         "unit": "asset"
       }
     },
